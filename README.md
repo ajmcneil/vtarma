@@ -1,8 +1,8 @@
 # vtarma
 
-Code and data for paper on `Modelling volatile time series with v-transforms and copulas' by Alexander J. McNeil (2021). 
+Code and data for the paper:
 
-
+McNeil, A.J. (2021). Modelling volatile time series with v-transforms and copulas. Risks, 9(14). https://www.mdpi.com/2227-9091/9/1/14
 
 ### Note
 
