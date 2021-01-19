@@ -6,4 +6,4 @@ McNeil, A.J. (2021). Modelling volatile time series with v-transforms and copula
 
 ### Note
 
-To reproduce the analyses in the paper exactly you should use version 0.1.3 of the tscopula package, which is available here. More recent version of the package give slightly different results and are available here: https://github.com/ajmcneil/tscopula
+To reproduce the analyses in the paper requires version 0.1.3 of the `tscopula` package; this can be obtained by writing to the author. More recent version of the package give slightly improved results. The most recent version is available here: https://github.com/ajmcneil/tscopula
