@@ -6,4 +6,6 @@ McNeil, A.J. (2021). Modelling volatile time series with v-transforms and copula
 
 ### Note
 
-To reproduce the analyses in the paper exactly requires version 0.1.3 of the `tscopula` package; this can be obtained by writing to the author. More recent versions of the package give slightly improved results. The most recent version is available here: https://github.com/ajmcneil/tscopula.
+Since publishing the paper I have been able to obtain even better fitting results for the VT-ARMA models by changing to a grid search for the fulcrum parameter. This is theoretically better supported because the profile likelihood can have local maxima. The scripts on this repository now give superior results to the ones published in the paper. The code to exactly reproduce the numbers in the paper is available on request.
+
+To run the code you need the `tscopula` package which is available here: https://github.com/ajmcneil/tscopula.
