@@ -1,7 +1,7 @@
 ---
 title: "V-transform paper: part 1"
 author: "Alexander J. McNeil"
-date: "`r Sys.Date()`"
+date: "2021-01-05"
 ---
 
 ```{r setup, include = FALSE}
@@ -12,7 +12,7 @@ knitr::opts_chunk$set(
 options(knitr.kable.NA = '')
 ```
 
-This markdown script is the first of two scripts reproducing analyses in the paper "Modelling volatile time series using v-transforms and copulas" by Alexander J.~McNeil (2020).
+This markdown script is the first of three scripts reproducing analyses in the paper "Modelling volatile time series using v-transforms and copulas" by Alexander J.~McNeil (2020).
 
 ## Libraries
 
