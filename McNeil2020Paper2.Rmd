@@ -1,7 +1,7 @@
 ---
 title: "V-transform paper: part 2"
 author: "Alexander J. McNeil"
-date: "`r Sys.Date()`"
+date: "2021-01-05"
 ---
 
 ```{r setup, include = FALSE}
@@ -12,7 +12,7 @@ knitr::opts_chunk$set(
 options(knitr.kable.NA = '')
 ```
 
-This markdown script is the second of two scripts reproducing analyses in the paper "Modelling volatile time series using v-transforms and copulas" by Alexander J.~McNeil (2020).
+This markdown script is the second of three scripts reproducing analyses in the paper "Modelling volatile time series using v-transforms and copulas" by Alexander J.~McNeil (2021).
 
 ## Libraries
 
@@ -21,12 +21,16 @@ We need the following:
 ```{r, echo = TRUE, warning = FALSE, message = FALSE}
 library(tscopula) # main library
 library(stats4) # for AIC
-library(plyr) # rbinding dataframes
-library(xtable) # nice tables
-library(data.table) # for transpose data.frame
-library(rugarch) # comparison of VaR estimate with GARCH
-library(xts) # for plot.zoo
+library(xts) # for handling the time series data
 library(report) # for citations of reports
+library(rugarch) # comparison of VaR estimate with GARCH
+setMethod("logLik", "uGARCHfit", function(object) {
+  ll <- likelihood(object)
+  attr(ll, "nobs") <- object@model$modeldata$T
+  attr(ll, "df") <- length(coef(object))
+  class(ll) <- "logLik"
+  ll
+})
 ```
 ## Empirical v-transform
 
@@ -44,72 +48,64 @@ plot(acf(qnorm(V), plot = FALSE), ylab="ACF of z", main= " ")
 
 ## Fitting VT-ARMA copula models to data
 
-We start with a Markovian AR(1) model and the linear v-transform. Optimization is by Nelder-Mead.
-
-
-```{r, echo = TRUE}
-tsoptions <- list(hessian = TRUE, method = "Nelder-Mead", avoidzero= FALSE)
-
-modspec <- vtscopula(armacopula(list(ar = 0.5)), Vlinear(0.45))
-vt1arma10 <- fit(modspec, U, tsoptions = tsoptions)
-```
-
-### ARMA(1,1) models
-
-The next set of models are ARMA(1,1) models with an increasingly more complicated v-transform. The starting parameters are always set to be close to the optimum from the previous fit.
-
-```{r, echo = TRUE}
-modspec <- vtscopula(armacopula(list(ar = 0.95, ma = -0.85)), Vlinear(0.45))
-vt1arma11 <- fit(modspec, U, tsoptions = tsoptions)
-modspec <- vtscopula(armacopula(list(ar = 0.96, ma = -0.84)), V2p(delta=0.42, kappa=1))
-vt2arma11 <- fit(modspec, U, tsoptions = tsoptions)
-modspec <- vtscopula(armacopula(list(ar = 0.9615, ma = -0.836)), V3p(delta=0.462, kappa=1, xi = 1))
-vt3arma11 <- fit(modspec, U, tsoptions = tsoptions)
-```
-
-
-### Process results
-
-Results are summarized in a table.
-
-```{r, echo = TRUE}
-models <- c("vt1arma10", "vt1arma11", "vt2arma11", 
-            "vt3arma11")
-process_results <- function(){
-  allresults <- list()
-  for (i in 1:length(models)){
-    results <- eval(parse(text = models[i]))
-    copmod <- results@tscopula
-    V <- vtrans(copmod@Vtransform, U, correction = TRUE)
-    resid <- kfilter(copmod@Vcopula, V)[, "resid"]
-    SW <- shapiro.test(as.numeric(resid))$p.value
-    pars <- coef(results)
-    ses <- safe_ses(results@fit$hessian)
-    names(ses) <- names(pars)
-    pars <- as.list(pars)
-    ses <- as.list(ses)
-    df1 <- data.frame(name = models[i], pars , SW,
-                      logLik = as.numeric(logLik(results)), AIC = AIC(results))
-    df2 <- data.frame(ses)
-    allresults[[2*(i-1)+1]] <- df1
-    allresults[[2*(i-1)+2]] <- df2
-  }
-  allresults
-}
-allresults <- process_results()
-tableout <- do.call(rbind.fill, allresults)
-tableout <- tableout[,c("name", "ar1", "ma1", "delta", "kappa", "xi","SW","logLik","AIC")]
-colnames(tableout) <- c("Model", "$\\alpha_1$", "$\\beta_1$", "$\\delta$", "$\\kappa$", "$\\xi$", "SW", "$L$", "AIC") 
-knitr::kable(tableout, digits = 3)
-```
-
-According to AIC the most effective model is the VT-ARMA(1,1) model with 2-parameter v-transform. The following graphs show various diagnostics for the fit.
+We use the `profilefulcrum` function to investigate different values for the fulcrum.
 
 ```{r, echo=TRUE, fig.show='hold', dev.args =list(pointsize=9)}
-plot(vt2arma11, type=3, bw = TRUE)
-plot(vt2arma11, type=4, bw = TRUE)
-plot(vt2arma11, type=5, bw = TRUE)
-plot(vt2arma11, type=2, bw = TRUE)
+
+modspec1 <- vtscopula(armacopula(list(ar = 0.25)), Vlinear())
+modspec2 <- vtscopula(armacopula(list(ar = 0.95, ma = -0.85)), Vlinear())
+modspec3 <- vtscopula(armacopula(list(ar = 0.95, ma = -0.85)), V2p())
+modspec4 <- vtscopula(armacopula(list(ar = 0.95, ma = -0.85)), V3p())
+
+deltavals <- c(0, 1/11, 2/11, 3/11, seq(from = 4/11, to = 6/11, length = 50), 7/11, 8/11, 9/11, 1)
+
+tmp1 <- profilefulcrum(U, modspec1, locations = deltavals, plot = FALSE)
+tmp2 <- profilefulcrum(U, modspec2, locations = deltavals, plot = FALSE)
+tmp3 <- profilefulcrum(U, modspec3, locations = deltavals, plot = FALSE)
+tmp4 <- profilefulcrum(U, modspec4, locations = deltavals)
+
+lines(tmp1[,1], tmp1[,2], col =2)
+lines(tmp2[,1], tmp2[,2], col =3)
+lines(tmp3[,1], tmp3[,2], col =4)
+```
+
+We obtain the optimal values of the fulcrum for each v-transform and fit the corresponding models.
+
+```{R, echo = TRUE}
+delta4 <- tmp4[tmp4[,2] == max(tmp4[,2]), 1]
+delta3 <- tmp3[tmp3[,2] == max(tmp3[,2]), 1]
+delta2 <- tmp2[tmp2[,2] == max(tmp2[,2]), 1]
+delta1 <- tmp1[tmp1[,2] == max(tmp1[,2]), 1]
+
+modspec1@Vtransform@pars[1] <- as.numeric(delta1)
+modspec2@Vtransform@pars[1] <- as.numeric(delta2)
+modspec3@Vtransform@pars[1] <- as.numeric(delta3)
+modspec4@Vtransform@pars[1] <- as.numeric(delta4)
+
+tsoptions <- list(hessian = TRUE, method = "Nelder-Mead")
+vt1arma10 <- fit(modspec1, U, tsoptions = tsoptions)
+vt1arma11 <- fit(modspec2, U, tsoptions = tsoptions)
+vt2arma11 <- fit(modspec3, U, tsoptions = tsoptions)
+vt3arma11 <- fit(modspec4, U, tsoptions = tsoptions)
+
+knitr::kable(AIC(vt1arma10, vt1arma11, vt2arma11, vt3arma11), digits=3)
+vt1arma11
+```
+
+The model with linear v-transform is favoured (very slightly) by AIC. We carry out a Shapiro test on the residuals and make a number of plots.
+
+```{r, echo=TRUE, fig.show='hold', dev.args =list(pointsize=9)}
+vtcop <- vt1arma11
+
+copmod <- vtcop@tscopula
+V <- vtrans(copmod@Vtransform, U)
+resid <- kfilter(copmod@Vcopula, V)[, "resid"]
+shapiro.test(as.numeric(resid))$p.value
+
+plot(vtcop, plotoption=3)
+plot(vtcop, plotoption=4)
+plot(vtcop, plotoption=5)
+plot(vtcop, plotoption=2)
 ```
 
 ## Adding a parametric marginal distribution
@@ -123,48 +119,32 @@ marg_laplace <- fit(margin("laplace",
 marg_dweibull <- fit(margin("doubleweibull", 
                             pars = c(mu = 0.2, shape =0.8, scale = 2.7)), X)
 
-vtcop <- vt2arma11
-
 mod_st <- tscm(vtcop, margin = marg_st)
 mod_st <- fit(mod_st, X, method = "full", tsoptions = tsoptions)
+
 mod_laplace <- tscm(vtcop, margin = marg_laplace)
 mod_laplace <- fit(mod_laplace, X, method = "full", tsoptions = tsoptions)
+
 mod_dweibull <- tscm(vtcop, margin = marg_dweibull)
 mod_dweibull <- fit(mod_dweibull, as.numeric(X), method = "full", tsoptions = tsoptions)
-```
 
-These are the results.
-
-```{R, echo = TRUE}
-models <- c("mod_st", "mod_laplace", "mod_dweibull")
-names(mod_st@margin@pars) <- c("shape", "mu", "sigma")
-names(mod_laplace@margin@pars) <- c("mu", "sigma")
-names(mod_dweibull@margin@pars) <- c("mu", "shape","sigma")
-fullresults <- process_results()
-tableout <- do.call(rbind.fill, fullresults)
-tableout <- tableout[,c("ar1","ma1","delta","kappa","shape",
-                        "mu","sigma","SW","logLik","AIC")]
-tableout <- transpose(tableout)
-rownames(tableout) <- c("$\\alpha_1$",  "$\\beta_1$", "$\\delta$", "$\\kappa$", "$\\eta$", "$\\mu$", "$\\sigma$", 
-                        "SW", "$L$", "AIC")
-colnames(tableout) <- c(models[1], "s.e", models[2], "s.e.", models[3], "s.e.")
-knitr::kable(tableout, digits = 3)
+knitr::kable(AIC(mod_st, mod_laplace, mod_dweibull), digits = 3)
 ```
 
 Graphical analyses of fitted double Weibull.
 
 ```{R, echo=TRUE, fig.show='hold', dev.args =list(pointsize=9)}
 names(mod_dweibull@margin@pars) <- c("mu", "shape","scale")
-plot(mod_dweibull, type =2, bw = TRUE)
-plot(mod_dweibull, type =3, bw = TRUE)
-plot(mod_dweibull, type =6, bw = TRUE)
-plot(mod_dweibull, type =4, bw = TRUE)
+plot(mod_dweibull, plottype = "margin")
+plot(mod_dweibull, plottype = "volprofile")
+plot(mod_dweibull, plottype ="volproxy")
+plot(mod_dweibull, plotoption =2, plottype = "volproxy")
 ```
 
 Some implications of the fitted model: we estimate the change point value $\mu_T$; we also calculate the volatility response for log-return values of -10 and +10.
 
 ```{R, echo=TRUE, fig.show='hold', dev.args =list(pointsize=9)}
-qmarg(mod_dweibull@margin, mod_dweibull@fit$par["vt.delta"])
+qmarg(mod_dweibull@margin, mod_dweibull@tscopula@Vtransform@pars[1])
 qnorm(vtrans(mod_dweibull@tscopula@Vtransform,pmarg(mod_dweibull@margin, c(-10,10))))
 ```
 
@@ -199,64 +179,6 @@ alpha <- 0.05
 VaR <- quantile(mod_dweibull, alpha)
 VaR_alt <- quantile(mod_garch_ged, alpha)
 plot.zoo(cbind(X, VaR_alt, VaR), 
-         plot.type="single", 
-         col=c("grey","black","red"), 
-         xlab="", ylab="", type=c("h", "l", "l"))
-```
-
-## Out-of-sample forecasting
-
-The final section requires some patience. We first set up the data for forecasting.
-
-```{R, echo = TRUE}
-load("BTCUSD1219.RData")
-BTCUSD1219 <- BTCUSD1219$`BTCUSD=X.Close` # closing values
-X2 <- (diff(log(BTCUSD1219))[-1]) * 100
-X2 <- X2[-(1:43)]
-n0 <- 1000 # length of moving window
-nforecast <- length(X2) - n0 # number of forecasts (period 2016-19)
-```
-
-We use the best VT-ARMA model for forecasting.
-
-```{R, echo = TRUE}
-tsoptions <- list(hessian = FALSE, method = "Nelder-Mead", avoidzero= FALSE)
-VaR <- matrix(NA,ncol=2, nrow = nforecast)
-for (i in 1:nforecast){
-  fitdata <- as.numeric(X2[i:(i+n0-1)])
-  fit <- fit(mod_dweibull, fitdata, tsoptions = tsoptions)
-  VaR[i,1] <- quantile(fit, 0.05,last = TRUE)
-  VaR[i,2] <- quantile(fit, 0.01, last = TRUE)
-}
-```
-
-We also use the best GARCH model for forecasting.
-
-```{R, echo = TRUE}
-roll <- ugarchroll(garchmod_ged, X2, n.ahead = 1, 
-                   forecast.length = nforecast, 
-                   refit.every = 1, 
-                   refit.window = "moving",
-                   VaR.alpha = c(0.05,0.01), keep.coef = F)
-```
-
-We compare results and plot them as before.
-
-```{R, echo = TRUE, fig.show='hold', fig.width = 6, fig.height = 4, dev.args =list(pointsize=9)}
-sum(roll@forecast$VaR$realized < roll@forecast$VaR$`alpha(5%)`)
-sum(roll@forecast$VaR$realized < VaR[,1])
-nforecast*0.05
-
-sum(roll@forecast$VaR$realized < roll@forecast$VaR$`alpha(1%)`)
-sum(roll@forecast$VaR$realized < VaR[,2])
-nforecast*0.01
-
-Xforecast <- X2[-(1:n0)]
-VaR_GARCH <- roll@forecast$VaR$`alpha(5%)`
-attributes(VaR_GARCH) <- attributes(Xforecast)
-VaR_VTARMA <- VaR[,1]
-attributes(VaR_VTARMA) <- attributes(Xforecast)
-plot.zoo(cbind(Xforecast, VaR_GARCH, VaR_VTARMA), 
          plot.type="single", 
          col=c("grey","black","red"), 
          xlab="", ylab="", type=c("h", "l", "l"))
