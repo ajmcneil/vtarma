@@ -102,10 +102,12 @@ V <- vtrans(copmod@Vtransform, U)
 resid <- kfilter(copmod@Vcopula, V)[, "resid"]
 shapiro.test(as.numeric(resid))$p.value
 
-plot(vtcop, plotoption=3)
-plot(vtcop, plotoption=4)
-plot(vtcop, plotoption=5)
-plot(vtcop, plotoption=2)
+plot(vtcop, plottype="residual")
+res <- resid(vtcop)
+acf(res)
+acf(abs(res))
+mu_t <- resid(vtcop, trace = TRUE)
+ts.plot(mu_t)
 ```
 
 ## Adding a parametric marginal distribution
@@ -137,8 +139,8 @@ Graphical analyses of fitted double Weibull.
 names(mod_dweibull@margin@pars) <- c("mu", "shape","scale")
 plot(mod_dweibull, plottype = "margin")
 plot(mod_dweibull, plottype = "volprofile")
+plot(mod_dweibull, plottype = "vtransform")
 plot(mod_dweibull, plottype ="volproxy")
-plot(mod_dweibull, plotoption =2, plottype = "volproxy")
 ```
 
 Some implications of the fitted model: we estimate the change point value $\mu_T$; we also calculate the volatility response for log-return values of -10 and +10.
